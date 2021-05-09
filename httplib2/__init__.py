@@ -75,7 +75,7 @@ from gettext import gettext as _
 import socket
 
 try:
-    from httplib2 import socks
+    from calibre_plugins.goodreads_sync.httplib2 import socks
 except ImportError:
     try:
         import socks
@@ -102,7 +102,7 @@ def _ssl_wrap_socket(sock, key_file, cert_file, disable_validation,
     else:
         cert_reqs = ssl.CERT_REQUIRED
     if ssl_version is None:
-        ssl_version = ssl.PROTOCOL_SSLv23
+        ssl_version = ssl.PROTOCOL_TLS  #New in version 3.6
 
     if hasattr(ssl, 'SSLContext'):  # Python 2.7.9
         context = ssl.SSLContext(ssl_version)
@@ -155,7 +155,7 @@ __all__ = [
 
 
 # The httplib debug level, set to a non-zero value to get debug output
-debuglevel = 0
+debuglevel = 1
 
 # A request will be tried 'RETRIES' times if it fails at the socket/connection level.
 RETRIES = 2
@@ -1124,11 +1124,14 @@ class HTTPSConnectionWithTimeout(httplib.HTTPSConnection):
                     raise
             except (socket.timeout, socket.gaierror):
                 raise
-            except socket.error as msg:
+            except socket.error as se:
+                msg = str(se)
                 if self.debuglevel > 0:
-                    print("connect fail: (%s, %s)" % (self.host, self.port))
+                    print("connect fail: (%s, %s, %s)" % (self.host, self.port, str(se)))
                     if use_proxy:
                         print("proxy: %s" % str((proxy_host, proxy_port, proxy_rdns, proxy_user, proxy_pass, proxy_headers)))
+                    import traceback
+                    traceback.print_exc()
                 if self.sock:
                     self.sock.close()
                 self.sock = None

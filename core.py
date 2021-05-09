@@ -97,7 +97,7 @@ class HttpHelper(object):
             self.proxy_info = httplib2.ProxyInfo(proxy_type, 
                                                  proxy['host'], 
                                                  proxy['port'], 
-                                                 proxy_rdns=None, 
+                                                 proxy_rdns=True, 
                                                  proxy_user=proxy['user'], 
                                                  proxy_pass=proxy['pass']
                                                  )
