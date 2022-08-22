@@ -24,7 +24,7 @@ class ActionGoodreadsSync(InterfaceActionBase):
     description             = _('Sync from Calibre with the shelves of your GoodReads.com account')
     supported_platforms     = ['windows', 'osx', 'linux']
     author                  = 'Grant Drake with additions by David Forrester'
-    version                 = (1, 15, 1)
+    version                 = (1, 15, 6)
     minimum_calibre_version = (0, 8, 18)
 
     #: This field defines the GUI plugin class that contains all the code

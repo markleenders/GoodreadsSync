@@ -1,3 +1,19 @@
+[B]Version 1.15.6[/B] - 15 August 2022
+Fix: Error in previous version meant some menu items were not enabled on the "Sync from Goodreads shelf" dialog.
+
+[B]Version 1.15.5[/B] - 11 August 2022
+Fix: Calibre v6/Qt6 - Drag-and-drop to "Link Goodreads" and "Switchdialog.
+Fix: Calibre v6/Qt6 - Fix selection issues as Qt6 allows deleselecting all entries in the lists.
+
+[B]Version 1.15.4[/B] - 13 July 2022
+Fix: Calibre v6/Qt6 - Fix date handling in dialogs.
+
+[B]Version 1.15.3[/B] - 12 July 2022
+Change: Updates for calibre v6/Qt6
+
+[B]Version 1.15.2[/B] - 11 June 2021 - made by davidfor
+Change: Allow the list of actions to stretch when the height of the Sync from shelf dialog is changed.
+
 [B]Version 1.15.1[/B] - 19 March 2021 - made by davidfor
 Fix: Sync 100 books per shelf as with 200 it just keeps going. 
 

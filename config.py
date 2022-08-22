@@ -15,18 +15,28 @@ import six
 from six import text_type as unicode
 
 try:
-    from PyQt5 import QtCore
-    from PyQt5 import QtWidgets as QtGui
     from PyQt5.Qt import (Qt, QWidget, QVBoxLayout, QLabel, QLineEdit, QGridLayout, QUrl,
                           QGroupBox, QHBoxLayout, QComboBox, QCheckBox, QFormLayout,
                           QIcon, QTableWidget, QTableWidgetItem, QPushButton, QInputDialog,
-                          QAbstractItemView, QDialog, QDialogButtonBox, QAction)
+                          QAbstractItemView, QDialog, QDialogButtonBox, QAction, QToolButton, 
+                          QSpacerItem
+                          )
+    from PyQt5.QtWidgets import QSizePolicy
 except ImportError:
     from PyQt4.Qt import (Qt, QWidget, QVBoxLayout, QLabel, QLineEdit, QGridLayout, QUrl,
                           QGroupBox, QHBoxLayout, QComboBox, QCheckBox, QFormLayout,
                           QIcon, QTableWidget, QTableWidgetItem, QPushButton, QInputDialog,
-                          QAbstractItemView, QDialog, QDialogButtonBox, QAction)
-    from PyQt4 import QtGui, QtCore
+                          QAbstractItemView, QDialog, QDialogButtonBox, QAction, QToolButton,
+                          QSpacerItem)
+    from PyQt4.QtGui import QSizePolicy
+
+# Maintain backwards compatibility with older versions of Qt and calibre.
+try:
+    qSizePolicy_Minimum = QSizePolicy.Policy.Minimum
+    qSizePolicy_Expanding = QSizePolicy.Policy.Expanding
+except:
+    qSizePolicy_Minimum = QSizePolicy.Minimum
+    qSizePolicy_Expanding = QSizePolicy.Expanding
 
 from calibre import prints
 from calibre.constants import DEBUG
@@ -37,7 +47,14 @@ from calibre.utils.icu import sort_key
 
 from calibre_plugins.goodreads_sync.common_utils import (NoWheelComboBox, SizePersistedDialog,
             ReadOnlyTextIconWidgetItem, get_icon, CheckableTableWidgetItem, ReadOnlyTableWidgetItem,
-            ImageTitleLayout, KeyboardConfigDialog, CustomColumnComboBox)
+            ImageTitleLayout, KeyboardConfigDialog, CustomColumnComboBox, debug_print)
+
+SUPPORTS_CREATE_CUSTOM_COLUMN = False
+try:
+    from calibre.gui2.preferences.create_custom_column import CreateNewCustomColumn
+    SUPPORTS_CREATE_CUSTOM_COLUMN = True
+except ImportError as e:
+    SUPPORTS_CREATE_CUSTOM_COLUMN = False
 
 try:
     load_translations()
@@ -112,13 +129,63 @@ KEY_USER_SECRET = 'userSecret'
 KEY_SHELVES = 'shelves'
 DEFAULT_USERS_STORE = {}
 
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS               = '#goodreads_tags'
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING             = '#goodreads_rating'
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ          = '#goodreads_date_read'
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT        = '#goodreads_review'
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS   = '#goodreads_reading_progress'
+CUSTOM_COLUMN_DEFAULTS = {
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS : {
+                    'column_heading': _("Goodreads Tags"),
+                    'datatype' : 'text',
+                    'is_multiple' : True,
+                    'description' : _("Goodreads tags used for mapping to calbre."),
+                    'columns_list' : 'avail_text_columns',
+                    'config_label' : _('Tags column:'),
+                    'config_tool_tip' : _('For use with the "Download tags from shelves" and "Upload tags as shelves" menu items'),
+                    'initial_items': ['tags']
+                },
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING : {
+                    'column_heading': _("Goodreads Rating"),
+                    'datatype' : 'rating',
+                    'description' : _("Rating for the book."),
+                    'columns_list' : 'avail_rating_columns',
+                    'config_label' : _('Rating Column:'),
+                    'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'),
+                    'initial_items': ['']
+                },
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ : {
+                    'column_heading': _("Date Read"),
+                    'datatype' : 'datetime',
+                    'description' : _("Date when the book was last read."),
+                    'columns_list' : 'avail_date_columns',
+                    'config_label' : _('Date read column:'),
+                    'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'),
+                    'initial_items': ['']
+                },
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT : {
+                    'column_heading': _("Goodreads Review"),
+                    'datatype' : 'comments',
+                    'description' : _("Review of book."),
+                    'columns_list' : 'get_long_text_custom_columns',
+                    'config_label' : _('Review text column:'),
+                    'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'),
+                    'initial_items': ['','comments']
+                },
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS : {
+                    'column_heading': _("Goodreads Progress"),
+                    'datatype' : 'int',
+                    'description' : _("Reading progress for the book"),
+                    'columns_list' : 'avail_number_columns',
+                    'config_label' : _('Reading progress column:'),
+                    'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'),
+                    'initial_items': ['']
+                },
+            }
+
+
 URL = 'http://www.goodreads.com'
 URL_HTTPS = 'https://www.goodreads.com'
-
-try:
-    _fromUtf8 = QtCore.QString.fromUtf8
-except AttributeError:
-    _fromUtf8 = lambda s: s
 
 # This is where all preferences for this plugin will be stored
 plugin_prefs = JSONConfig('plugins/Goodreads Sync')
@@ -574,21 +641,21 @@ class MaintainActionsDialog(SizePersistedDialog):
         table_layout.addWidget(self.sync_actions_table)
 
         # Add a vertical layout containing the the buttons to add/remove actions.
-        button_layout = QtGui.QVBoxLayout()
+        button_layout = QVBoxLayout()
         table_layout.addLayout(button_layout)
 
-        add_button = QtGui.QToolButton(self)
+        add_button = QToolButton(self)
         add_button.setToolTip(_('Add action'))
         add_button.setIcon(QIcon(I('plus.png')))
         add_button.clicked.connect(self.sync_actions_table.add_row)
         button_layout.addWidget(add_button)
 
-        delete_button = QtGui.QToolButton(self)
+        delete_button = QToolButton(self)
         delete_button.setToolTip(_('Delete action'))
         delete_button.setIcon(QIcon(I('minus.png')))
         delete_button.clicked.connect(self.sync_actions_table.delete_rows)
         button_layout.addWidget(delete_button)
-        spacerItem1 = QtGui.QSpacerItem(20, 40, QtGui.QSizePolicy.Minimum, QtGui.QSizePolicy.Expanding)
+        spacerItem1 = QSpacerItem(20, 40, qSizePolicy_Minimum, qSizePolicy_Expanding)
         button_layout.addItem(spacerItem1)
 
         if is_shelf_add_actions:
@@ -826,7 +893,7 @@ class ShelvesTableWidget(QTableWidget):
 class ConfigWidget(QWidget):
 
     def __init__(self, plugin_action, grhttp):
-        QWidget.__init__(self)
+        super(ConfigWidget, self).__init__()
         self.plugin_action = plugin_action
         self.db = plugin_action.gui.library_view.model().db
         self.grhttp = grhttp
@@ -834,6 +901,9 @@ class ConfigWidget(QWidget):
         self.users = plugin_prefs[STORE_USERS]
         self.user_name = None
         other_options = plugin_prefs[STORE_PLUGIN]
+        self.must_restart = False
+        self._get_create_new_custom_column_instance = None
+        self.supports_create_custom_column = SUPPORTS_CREATE_CUSTOM_COLUMN
 
         layout = QVBoxLayout(self)
         self.setLayout(layout)
@@ -846,12 +916,12 @@ class ConfigWidget(QWidget):
         self._user_combo.currentIndexChanged.connect(self.user_combo_index_changed)
         self._user_combo.setMinimumSize(150, 20)
         user_layout.addWidget(self._user_combo)
-        self._add_user_button = QtGui.QToolButton(self)
+        self._add_user_button = QToolButton(self)
         self._add_user_button.setToolTip(_('Add user profile'))
         self._add_user_button.setIcon(QIcon(I('plus.png')))
         self._add_user_button.clicked.connect(self.add_user_profile)
         user_layout.addWidget(self._add_user_button)
-        self._delete_user_button = QtGui.QToolButton(self)
+        self._delete_user_button = QToolButton(self)
         self._delete_user_button.setToolTip(_('Delete user profile'))
         self._delete_user_button.setIcon(QIcon(I('minus.png')))
         self._delete_user_button.clicked.connect(self.delete_user_profile)
@@ -940,54 +1010,45 @@ class ConfigWidget(QWidget):
         columns_group_box_layout.addLayout(columns_group_box_layout2)
         columns_group_box_layout.addStretch()
 
-        tags_column_label = QLabel(_('Tags column:'), self)
-        tags_column_label.setToolTip(_('For use with the "Download tags from shelves" and "Upload tags as shelves" menu items'))
-        tags_custom_columns = self.get_custom_columns(['text'])
-        self._tag_column_combo = CustomColumnComboBox(self, tags_custom_columns,
-                                                      other_options.get(KEY_TAG_MAPPING_COLUMN, 'tags'),
-                                                      initial_items=['tags'])
-        self._tag_column_combo.setMinimumWidth(120)
+        self.sync_custom_columns = {}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS] = {'current_columns' : self.get_text_custom_columns}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING] = {'current_columns': self.get_rating_custom_columns}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ] = {'current_columns': self.get_date_custom_columns}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT] = {'current_columns': self.get_long_text_custom_columns}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS] = {'current_columns': self.get_number_custom_columns}
+
+        self._tag_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS)
         self._tag_column_combo.currentIndexChanged[int].connect(self.tag_column_combo_changed)
-        tags_column_label.setBuddy(self._tag_column_combo)
-        columns_group_box_layout2.addRow(tags_column_label, self._tag_column_combo)
+        self._rating_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING)
+        self._dateread_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ)
+        self._review_text_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT)
+        self._reading_progress_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS)
 
-        rating_column_label = QLabel(_('Rating column:'), self)
-        rating_column_label.setToolTip(_('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'))
-        rating_custom_columns = self.get_custom_columns(['rating'])
-        self._rating_column_combo = CustomColumnComboBox(self, rating_custom_columns,
-                                                         other_options.get(KEY_RATING_COLUMN, ''),
-                                                         initial_items=['','rating'])
-        self._rating_column_combo.setMinimumWidth(120)
-        rating_column_label.setBuddy(self._rating_column_combo)
-        columns_group_box_layout2.addRow(rating_column_label, self._rating_column_combo)
-
-        dateread_column_label = QLabel(_('Date read column:'), self)
-        dateread_column_label.setToolTip(_('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'))
-        dateread_custom_columns = self.get_custom_columns(['datetime'])
-        self._dateread_column_combo = CustomColumnComboBox(self, dateread_custom_columns, other_options.get(KEY_DATE_READ_COLUMN, ''))
-        self._dateread_column_combo.setMinimumWidth(120)
-        dateread_column_label.setBuddy(self._dateread_column_combo)
-        columns_group_box_layout2.addRow(dateread_column_label, self._dateread_column_combo)
-
-        review_text_column_label = QLabel(_('Review text column:'), self)
-        review_text_column_label.setToolTip(_('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'))
-        review_text_custom_columns = self.get_custom_columns(['text','comments'])
-        self._review_text_column_combo = CustomColumnComboBox(self, review_text_custom_columns,
-                                                              other_options.get(KEY_REVIEW_TEXT_COLUMN, ''),
-                                                              initial_items=['','comments'])
-        self._review_text_column_combo.setMinimumWidth(120)
-        review_text_column_label.setBuddy(self._review_text_column_combo)
-        columns_group_box_layout2.addRow(review_text_column_label, self._review_text_column_combo)
-
-        reading_progress_column_label = QLabel(_('Reading progress column:'), self)
-        reading_progress_column_label.setToolTip(_('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'))
-        reading_progress_custom_columns = self.get_custom_columns(['float','int'])
-        self._reading_progress_column_combo = CustomColumnComboBox(self, reading_progress_custom_columns,
-                                                         other_options.get(KEY_READING_PROGRESS_COLUMN, ''),
-                                                         initial_items=[''])
-        self._reading_progress_column_combo.setMinimumWidth(120)
-        reading_progress_column_label.setBuddy(self._reading_progress_column_combo)
-        columns_group_box_layout2.addRow(reading_progress_column_label, self._reading_progress_column_combo)
+        self._tag_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS]['current_columns'](), 
+                    other_options.get(KEY_TAG_MAPPING_COLUMN, 'tags'), 
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS]['initial_items']
+                    )
+        self._rating_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING]['current_columns'](), 
+                    other_options.get(KEY_RATING_COLUMN, ''),
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING]['initial_items']
+                    )
+        self._dateread_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ]['current_columns'](), 
+                    other_options.get(KEY_DATE_READ_COLUMN, ''),
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ]['initial_items']
+                    )
+        self._review_text_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT]['current_columns'](), 
+                    other_options.get(KEY_REVIEW_TEXT_COLUMN, ''),
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT]['initial_items']
+                    )
+        self._reading_progress_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS]['current_columns'](), 
+                    other_options.get(KEY_READING_PROGRESS_COLUMN, ''),
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS]['initial_items']
+                    )
 
         keyboard_layout = QHBoxLayout()
         layout.addLayout(keyboard_layout)
@@ -1028,8 +1089,35 @@ class ConfigWidget(QWidget):
 
         plugin_prefs[STORE_PLUGIN] = other_options
 
+    def get_number_custom_columns(self):
+        column_types = ['float','int']
+        return self.get_custom_columns(column_types)
+
+    def get_rating_custom_columns(self):
+        column_types = ['rating','int']
+        custom_columns = self.get_custom_columns(column_types)
+        ratings_column_name = self.plugin_action.gui.library_view.model().orig_headers['rating']
+        custom_columns['rating'] = {'name': ratings_column_name}
+        return custom_columns
+
+    def get_text_custom_columns(self):
+        column_types = ['text']
+        return self.get_custom_columns(column_types)
+
+    def get_long_text_custom_columns(self):
+        column_types = ['text', 'comments']
+        debug_print("get_long_text_custom_columns")
+        return self.get_custom_columns(column_types)
+
+    def get_date_custom_columns(self):
+        column_types = ['datetime']
+        return self.get_custom_columns(column_types)
+
     def get_custom_columns(self, column_types):
-        custom_columns = self.plugin_action.gui.library_view.model().custom_columns
+        if self.supports_create_custom_column:
+            custom_columns = self.get_create_new_custom_column_instance.current_columns()
+        else:
+            custom_columns = self.plugin_action.gui.library_view.model().custom_columns
         available_columns = {}
         for key, column in custom_columns.items():
             typ = column['datatype']
@@ -1070,13 +1158,18 @@ class ConfigWidget(QWidget):
 
     def tag_column_combo_changed(self):
         selected_column = self._tag_column_combo.get_selected_column()
+        debug_print("tag_column_combo_changed - selected_column=", selected_column)
+        values = []
         if selected_column == 'tags':
             values = self.all_tags
-        else:
+        elif selected_column is not None:
             # Need to get all the possible values for this custom column
-            label = self.db.field_metadata.key_to_label(selected_column)
-            values = list(self.db.all_custom(label=label))
-            values.sort(key=sort_key)
+            try: # Catch an error when new columns are being added.
+                label = self.db.field_metadata.key_to_label(selected_column)
+                values = list(self.db.all_custom(label=label))
+                values.sort(key=sort_key)
+            except:
+                pass 
         self._shelves_table.set_tags_values(values)
 
     def add_user_profile(self):
@@ -1199,6 +1292,52 @@ class ConfigWidget(QWidget):
         d = KeyboardConfigDialog(self.plugin_action.gui, self.plugin_action.action_spec[0])
         if d.exec_() == d.Accepted:
             self.plugin_action.gui.keyboard.finalize()
+
+    def create_custom_column_controls(self, columns_group_box_layout, custom_col_name, min_width=120):
+        current_Location_label = QLabel(CUSTOM_COLUMN_DEFAULTS[custom_col_name]['config_label'], self)
+        current_Location_label.setToolTip(CUSTOM_COLUMN_DEFAULTS[custom_col_name]['config_tool_tip'])
+        initial_items = CUSTOM_COLUMN_DEFAULTS[custom_col_name].get('initial_items', [])
+        create_column_callback=partial(self.create_custom_column, custom_col_name) if self.supports_create_custom_column else None
+        avail_columns = self.sync_custom_columns[custom_col_name]['current_columns']()
+        custom_column_combo = CustomColumnComboBox(self, avail_columns, initial_items=initial_items, create_column_callback=create_column_callback)
+        custom_column_combo.setMinimumWidth(min_width)
+        current_Location_label.setBuddy(custom_column_combo)
+        columns_group_box_layout.addRow(current_Location_label, custom_column_combo)
+        self.sync_custom_columns[custom_col_name]['combo_box'] = custom_column_combo
+
+        return custom_column_combo
+
+    def create_custom_column(self, lookup_name=None):
+        display_params = {
+            'description': CUSTOM_COLUMN_DEFAULTS[lookup_name]['description']
+        }
+        datatype = CUSTOM_COLUMN_DEFAULTS[lookup_name]['datatype']
+        column_heading  = CUSTOM_COLUMN_DEFAULTS[lookup_name]['column_heading']
+        is_multiple = CUSTOM_COLUMN_DEFAULTS[lookup_name].get('is_multiple', False)
+
+        new_lookup_name = lookup_name
+
+        create_new_custom_column_instance = self.get_create_new_custom_column_instance
+        result = create_new_custom_column_instance.create_column(new_lookup_name, column_heading, datatype, is_multiple, display=display_params, generate_unused_lookup_name=True, freeze_lookup_name=False)
+        if result[0] == CreateNewCustomColumn.Result.COLUMN_ADDED:
+            # print(self.get_text_custom_columns())
+            # print(self.plugin_action.gui.current_db.field_metadata.custom_field_metadata())
+            self.sync_custom_columns[lookup_name]['combo_box'].populate_combo(
+                                self.sync_custom_columns[lookup_name]['current_columns'](), 
+                                result[1],
+                                initial_items=CUSTOM_COLUMN_DEFAULTS[lookup_name]['initial_items']
+                                )
+            self.must_restart = True
+            return True
+        
+        return False
+
+    @property
+    def get_create_new_custom_column_instance(self):
+        if self._get_create_new_custom_column_instance is None and self.supports_create_custom_column:
+            self._get_create_new_custom_column_instance = CreateNewCustomColumn(self.plugin_action.gui)
+        return self._get_create_new_custom_column_instance
+
 
 # Ensure our config gets migrated
 migrate_config_if_required()

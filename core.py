@@ -97,7 +97,7 @@ class HttpHelper(object):
             self.proxy_info = httplib2.ProxyInfo(proxy_type, 
                                                  proxy['host'], 
                                                  proxy['port'], 
-                                                 proxy_rdns=True, 
+                                                 proxy_rdns=None, 
                                                  proxy_user=proxy['user'], 
                                                  proxy_pass=proxy['pass']
                                                  )
@@ -431,6 +431,11 @@ class HttpHelper(object):
         
         self.plugin_action.progressbar_format(_("Page: %v"))
         for shelf in shelves:
+            # MDL: Set progressbar to number of retrieves from shelf
+            shelf_size = int(int(shelf['book_count'])/100) + 1
+            self.plugin_action.progressbar_show(shelf_size) 
+            #debug_print ("shelf size:", shelf_size)
+            # MDL
             shelf_name = shelf['name']
             self.plugin_action.progressbar_label(_("Syncing from shelf: {0}").format(shelf_name))
             page = 0
@@ -589,6 +594,10 @@ class HttpHelper(object):
         book['goodreads_date_added'] = UNDEFINED_DATE
         book['goodreads_date_updated'] = UNDEFINED_DATE
         book['goodreads_review_text'] = ''
+	# MDL
+        book['goodreads_ratings_count'] = content_json.get('ratings_count', '')
+        debug_print('ratings-count: %s' % str(book['goodreads_ratings_count']))
+	# MDL
         return book
 
     def _convert_review_xml_node_to_book(self, review_node, include_work=False):
@@ -624,6 +633,20 @@ class HttpHelper(object):
             book['goodreads_read_at'] = self._parse_goodreads_date(review_node.findtext('read_at'))
             book['goodreads_date_added'] = self._parse_goodreads_date(review_node.findtext('date_added'))
             book['goodreads_date_updated'] = self._parse_goodreads_date(review_node.findtext('date_updated'))
+            # MDL fix empty date read  
+            if book['goodreads_read_at'] == UNDEFINED_DATE:
+                #debug_print(book['goodreads_title'], "by" , book['goodreads_author'])
+                #debug_print("Added   :  " , book['goodreads_date_added'])
+                #debug_print("Started :  " , book['goodreads_started_at'])
+                #debug_print("Updated :  " , book['goodreads_date_updated'])
+                if book['goodreads_date_added'] != UNDEFINED_DATE:
+                    book['goodreads_read_at'] = book['goodreads_date_added']
+                elif book['goodreads_started_at'] != UNDEFINED_DATE:
+                    book['goodreads_read_at'] = book['goodreads_started_at']
+                else:
+                    book['goodreads_read_at'] = book['goodreads_date_updated']
+                debug_print("Read At :  " , book['goodreads_read_at'])
+            # MDL 
             #review_text = review_node.findtext('body')
             book['goodreads_review_text'] = review_node.findtext('body').strip()
             if len(book['goodreads_review_text']) > 0:
@@ -639,6 +662,13 @@ class HttpHelper(object):
             book['goodreads_date_added'] = ''
             book['goodreads_date_updated'] = ''
             book['goodreads_review_text'] = ''
+        # MDL Set number of pages
+        book['num_pages'] = book_node.findtext('num_pages')
+        #debug_print("Num pages:", book['num_pages'])
+        book['average_rating'] = book_node.findtext('average_rating')
+        book['goodreads_ratings_count'] = book_node.findtext('ratings_count')
+        debug_print("id@", goodreads_id, " @rtc@" , book['goodreads_ratings_count'], "@rta@", book['average_rating'],"@Title@", title, '@Author@',book['goodreads_author'])
+        # MDL
         if include_work:
             work_node = book_node.find('work')
             if work_node is not None:

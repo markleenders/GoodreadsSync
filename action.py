@@ -919,8 +919,33 @@ class GoodreadsSyncAction(InterfaceAction):
         return tag_mappings
 
     def show_configuration(self):
-        self.interface_action_base_plugin.do_user_config(self.gui)
+        debug_print("GoodReads Sync::show_configuration - before do_user_config")
+        restart_message=_("Calibre must be restarted before the plugin can be configured.")
+        # Check if a restart is needed. If the restart is needed, but the user does not
+        # trigger it, the result is true and we do not do the configuration.
+        if self.check_if_restart_needed(restart_message=restart_message):
+            return
 
+        self.interface_action_base_plugin.do_user_config(self.gui)
+        debug_print("GoodReads Sync::show_configuration - after do_user_config")
+        restart_message= _("New custom colums have been created."
+                            "\nYou will need to restart calibre for this change to be applied."
+                        )
+        self.check_if_restart_needed(restart_message=restart_message)
+
+    def check_if_restart_needed(self, restart_message=None, restart_needed=False):
+        if self.gui.must_restart_before_config or restart_needed:
+            if restart_message is None:
+                restart_message = _("Calibre must be restarted before the plugin can be configured.")
+            from calibre.gui2 import show_restart_warning
+            do_restart = show_restart_warning(restart_message)
+            if do_restart:
+                debug_print("GoodReads Sync::check_if_restart_needed - restarting calibre...")
+                self.gui.quit(restart=True)
+            else:
+                debug_print("GoodReads Sync::check_if_restart_needed - calibre needs to be restarted, do not open configuration")
+                return True
+        return False
 
     def progressbar(self, window_title=_("Goodreads Sync progress"), on_top=False, show=False):
         self.pb = ProgressBar(parent=self.gui, window_title=window_title, on_top=on_top)
