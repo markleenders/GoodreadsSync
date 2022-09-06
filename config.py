@@ -78,6 +78,7 @@ KEY_RATING_COLUMN = 'ratingColumn'
 KEY_DATE_READ_COLUMN = 'dateReadColumn'
 KEY_READING_PROGRESS_COLUMN = 'readingProgressColumn'
 KEY_REVIEW_TEXT_COLUMN = 'reviewTextColumn'
+KEY_NORAT_COLUMN = 'noratColumn'
 
 DEFAULT_STORE_VALUES = {
     KEY_DEV_TOKEN: 'UxvtOM3ogQWjfgiCnMleA',
@@ -94,7 +95,8 @@ DEFAULT_STORE_VALUES = {
     KEY_RATING_COLUMN: '',
     KEY_DATE_READ_COLUMN: '',
     KEY_READING_PROGRESS_COLUMN: '',
-    KEY_REVIEW_TEXT_COLUMN: ''
+    KEY_REVIEW_TEXT_COLUMN: '',
+    KEY_NORAT_COLUMN: ''
 }
 
 KEY_TAG_MAPPINGS = 'tagMappings'
@@ -102,11 +104,13 @@ KEY_ADD_ACTIONS = 'add_actions'
 KEY_ADD_RATING = 'add_rating'
 KEY_ADD_DATE_READ = 'add_date_read'
 KEY_ADD_REVIEW_TEXT = 'add_review_text'
+KEY_ADD_NORAT = 'add_norat'
 
 KEY_SYNC_ACTIONS = 'sync_actions'
 KEY_SYNC_RATING = 'sync_rating'
 KEY_SYNC_DATE_READ = 'sync_date_read'
 KEY_SYNC_REVIEW_TEXT = 'sync_review_text'
+KEY_SYNC_NORAT = 'sync_norat'
 
 STORE_SCHEMA_VERSION = 'SchemaVersion'
 DEFAULT_SCHEMA_VERSION = 1.68
@@ -669,6 +673,7 @@ class MaintainActionsDialog(SizePersistedDialog):
             rating_title = _('Sync rating from Goodreads when syncing from this shelf')
             date_read_title = _('Sync date read from Goodreads when syncing from this shelf')
             review_text_title = _('Sync review text from Goodreads when syncing from this shelf')
+            norat_title = _('Sync ratings count from Goodreads when syncing from this shelf')
             upload_rating_enabled = shelves[0].get(KEY_SYNC_RATING, False)
             upload_date_read_enabled = shelves[0].get(KEY_SYNC_DATE_READ, False)
             upload_review_text_enabled = shelves[0].get(KEY_SYNC_REVIEW_TEXT, False)
@@ -810,6 +815,8 @@ class ShelvesTableWidget(QTableWidget):
                 image_name = 'images/dateread_add.png'
             elif shelf.get(KEY_ADD_REVIEW_TEXT, False):
                 image_name = 'images/review_add.png'
+            elif shelf.get(KEY_ADD_NORAT, False):
+                image_name = 'images/rating_add.png'
         else:
             actions_key = KEY_SYNC_ACTIONS
             if shelf.get(KEY_SYNC_RATING, False) and shelf.get(KEY_SYNC_DATE_READ, False):
@@ -820,6 +827,8 @@ class ShelvesTableWidget(QTableWidget):
                 image_name = 'images/dateread_sync.png'
             elif shelf.get(KEY_SYNC_REVIEW_TEXT, False):
                 image_name = 'images/review_sync.png'
+            elif shelf.get(KEY_SYNC_NORAT, False):
+                image_name = 'images/rating_sync.png'
 
         if actions_key not in shelf:
             shelf[actions_key] = []
@@ -1080,6 +1089,7 @@ class ConfigWidget(QWidget):
         other_options[KEY_READING_PROGRESS_COLUMN] = self._reading_progress_column_combo.get_selected_column()
         other_options[KEY_DATE_READ_COLUMN] = self._dateread_column_combo.get_selected_column()
         other_options[KEY_REVIEW_TEXT_COLUMN] = self._review_text_column_combo.get_selected_column()
+        other_options[KEY_NORAT_COLUMN] = self._norat_column_combo.get_selected_column()
         for key in [KEY_DISPLAY_ADD, KEY_DISPLAY_REMOVE, KEY_DISPLAY_SYNC, 
                     KEY_AUTHOR_SWAP, KEY_DISPLAY_UPDATE_PROGRESS, KEY_PROGRESS_IS_PERCENT,
                     KEY_DISPLAY_VIEW_SHELF
@@ -1258,6 +1268,7 @@ class ConfigWidget(QWidget):
                         new_shelf_info[KEY_SYNC_RATING] = old_shelf_info.get(KEY_SYNC_RATING, False)
                         new_shelf_info[KEY_SYNC_DATE_READ] = old_shelf_info.get(KEY_SYNC_DATE_READ, False)
                         new_shelf_info[KEY_SYNC_REVIEW_TEXT] = old_shelf_info.get(KEY_SYNC_REVIEW_TEXT, False)
+                        new_shelf_info[KEY_SYNC_NORAT] = old_shelf_info.get(KEY_SYNC_NORAT, False)
                         new_shelf_info[KEY_TAG_MAPPINGS] = old_shelf_info.get(KEY_TAG_MAPPINGS, [])
                         break
 
