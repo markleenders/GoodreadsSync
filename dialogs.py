@@ -1934,7 +1934,7 @@ class DoShelfSyncTableWidget(QTableWidget):
         if len(goodreads_books) > 0:
             self.selectRow(0)
             
-        self.setColumnHidden(14, True)
+        self.setColumnHidden(15, True)
 
     def setMinimumColumnWidth(self, col, minimum):
         if self.columnWidth(col) < minimum:

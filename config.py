@@ -104,7 +104,6 @@ KEY_ADD_ACTIONS = 'add_actions'
 KEY_ADD_RATING = 'add_rating'
 KEY_ADD_DATE_READ = 'add_date_read'
 KEY_ADD_REVIEW_TEXT = 'add_review_text'
-KEY_ADD_NORAT = 'add_norat'
 
 KEY_SYNC_ACTIONS = 'sync_actions'
 KEY_SYNC_RATING = 'sync_rating'
@@ -138,6 +137,8 @@ SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_RATING             = '#goodreads_rating'
 SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ          = '#goodreads_date_read'
 SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT        = '#goodreads_review'
 SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS   = '#goodreads_reading_progress'
+SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT              = '#goodreads_norat'
+
 CUSTOM_COLUMN_DEFAULTS = {
                 SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS : {
                     'column_heading': _("Goodreads Tags"),
@@ -183,6 +184,15 @@ CUSTOM_COLUMN_DEFAULTS = {
                     'columns_list' : 'avail_number_columns',
                     'config_label' : _('Reading progress column:'),
                     'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with your Goodreads review for a book'),
+                    'initial_items': ['']
+                },
+                SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT : {
+                    'column_heading': _("Goodreads No Ratings"),
+                    'datatype' : 'int',
+                    'description' : _("Number of ratings column"),
+                    'columns_list' : 'avail_number_columns',
+                    'config_label' : _('No Rat column:'),
+                    'config_tool_tip' : _('For use with the "Add to shelf" and "Sync from shelf" menu items\nto synchronise with the Goodreads number of ratings for a book'),
                     'initial_items': ['']
                 },
             }
@@ -249,6 +259,7 @@ def migrate_config_if_required():
 
         goodreads_settings = plugin_prefs[STORE_PLUGIN]
         goodreads_settings[KEY_REVIEW_TEXT_COLUMN] = ''
+        goodreads_settings[KEY_NORAT_COLUMN] = ''
         plugin_prefs[STORE_PLUGIN] = goodreads_settings
 
 
@@ -815,8 +826,6 @@ class ShelvesTableWidget(QTableWidget):
                 image_name = 'images/dateread_add.png'
             elif shelf.get(KEY_ADD_REVIEW_TEXT, False):
                 image_name = 'images/review_add.png'
-            elif shelf.get(KEY_ADD_NORAT, False):
-                image_name = 'images/rating_add.png'
         else:
             actions_key = KEY_SYNC_ACTIONS
             if shelf.get(KEY_SYNC_RATING, False) and shelf.get(KEY_SYNC_DATE_READ, False):
@@ -1025,6 +1034,7 @@ class ConfigWidget(QWidget):
         self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ] = {'current_columns': self.get_date_custom_columns}
         self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT] = {'current_columns': self.get_long_text_custom_columns}
         self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS] = {'current_columns': self.get_number_custom_columns}
+        self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT] = {'current_columns': self.get_number_custom_columns}
 
         self._tag_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS)
         self._tag_column_combo.currentIndexChanged[int].connect(self.tag_column_combo_changed)
@@ -1032,6 +1042,7 @@ class ConfigWidget(QWidget):
         self._dateread_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_DATE_READ)
         self._review_text_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_REVIEW_TEXT)
         self._reading_progress_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS)
+        self._norat_column_combo = self.create_custom_column_controls(columns_group_box_layout2, SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT)
 
         self._tag_column_combo.populate_combo(
                     self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_TAGS]['current_columns'](), 
@@ -1057,6 +1068,11 @@ class ConfigWidget(QWidget):
                     self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS]['current_columns'](), 
                     other_options.get(KEY_READING_PROGRESS_COLUMN, ''),
                     initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_READING_PROGRESS]['initial_items']
+                    )
+        self._norat_column_combo.populate_combo(
+                    self.sync_custom_columns[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT]['current_columns'](), 
+                    other_options.get(KEY_NORAT_COLUMN, ''),
+                    initial_items=CUSTOM_COLUMN_DEFAULTS[SYNC_CUSTOM_COLUMN_DEFAULT_LOOKUP_NORAT]['initial_items']
                     )
 
         keyboard_layout = QHBoxLayout()
