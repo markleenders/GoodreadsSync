@@ -399,7 +399,7 @@ class UpdateReadingProgressTableWidget(QTableWidget):
         self.rating_column = rating_column
         self.date_read_column = date_read_column
         self.review_text_column = review_text_column
-        self.norat_column = '#norat'  #norat_column # MDL
+        self.norat_column = norat_column 
         self.create_context_menu()
         self.itemSelectionChanged.connect(self.item_selection_changed)
         self.doubleClicked.connect(self.search_for_goodreads_books_click)
@@ -571,7 +571,7 @@ class UpdateReadingProgressDialog(SizePersistedDialog):
         self.rating_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_RATING_COLUMN, '')
         self.date_read_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_DATE_READ_COLUMN, '')
         self.review_text_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_REVIEW_TEXT_COLUMN, '')
-        self.norat_column = '#norat' # MDL
+        self.norat_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_NORAT_COLUMN, '')
         self.progress_is_percent = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_PROGRESS_IS_PERCENT, True)
         self.is_rating_visible = False
         self.is_dateread_visible = False
@@ -1539,6 +1539,7 @@ class DoAddRemoveDialog(SizePersistedDialog):
         self.rating_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_RATING_COLUMN, '')
         self.date_read_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_DATE_READ_COLUMN, '')
         self.review_text_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_REVIEW_TEXT_COLUMN, '')
+        self.norat_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_NORAT_COLUMN, '')
         self.is_rating_visible = False
         self.is_dateread_visible = False
         self.is_review_text_visible = False
@@ -2144,7 +2145,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
         self.rating_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_RATING_COLUMN, None)
         self.date_read_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_DATE_READ_COLUMN, None)
         self.review_text_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_REVIEW_TEXT_COLUMN, None)
-        self.norat_column = '#norat'
+        self.norat_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_NORAT_COLUMN, None)
         self.update_rating = False
         self.update_date_read = False
         self.update_review_text = False
@@ -2494,7 +2495,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
                                 added_action = True
                                 sync_review_text_action = {'special':'review_text', 'action':'ADD', 'column':self.review_text_column, 'value':''}
                                 sync_actions.append(sync_review_text_action)
-                # MDL
+                # MDL WORK TO DO!!!
                 sync_ratings_action = {'action':'ADD', 'column':self.norat_column, 'value':'goodreads_ratings_count'}
                 sync_actions.append(sync_ratings_action)
                 # MDL
