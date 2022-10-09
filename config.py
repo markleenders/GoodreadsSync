@@ -236,6 +236,7 @@ def migrate_config_if_required():
                 shelf[KEY_ADD_DATE_READ] = False
                 shelf[KEY_SYNC_RATING] = False
                 shelf[KEY_SYNC_DATE_READ] = False
+                shelf[KEY_SYNC_NORAT] = False
         plugin_prefs[STORE_USERS] = users_settings
 
         goodreads_settings = plugin_prefs[STORE_PLUGIN]
@@ -688,6 +689,7 @@ class MaintainActionsDialog(SizePersistedDialog):
             upload_rating_enabled = shelves[0].get(KEY_SYNC_RATING, False)
             upload_date_read_enabled = shelves[0].get(KEY_SYNC_DATE_READ, False)
             upload_review_text_enabled = shelves[0].get(KEY_SYNC_REVIEW_TEXT, False)
+            upload_norat_enabled = shelves[0].get(KEY_SYNC_NORAT, False)
 
         self.upload_rating = QCheckBox(rating_title)
         layout.addWidget(self.upload_rating)
@@ -700,6 +702,11 @@ class MaintainActionsDialog(SizePersistedDialog):
         self.upload_review_text = QCheckBox(review_text_title)
         layout.addWidget(self.upload_review_text)
         self.upload_review_text.setChecked(upload_review_text_enabled)
+
+        if not is_shelf_add_actions:
+            self.upload_norat = QCheckBox(norat_title)
+            layout.addWidget(self.upload_norat)
+            self.upload_norat.setChecked(upload_norat_enabled)
 
         button_box = QDialogButtonBox(QDialogButtonBox.Ok | QDialogButtonBox.Cancel)
         button_box.accepted.connect(self.accept)
@@ -901,6 +908,7 @@ class ShelvesTableWidget(QTableWidget):
                     shelf[KEY_SYNC_RATING] = d.upload_rating.isChecked()
                     shelf[KEY_SYNC_DATE_READ] = d.upload_date_read.isChecked()
                     shelf[KEY_SYNC_REVIEW_TEXT] = d.upload_review_text.isChecked()
+                    shelf[KEY_SYNC_NORAT] = d.upload_norat.isChecked()
                 self.populate_table_row(row.row(), shelf)
 
     def edit_shelves_on_goodreads(self):

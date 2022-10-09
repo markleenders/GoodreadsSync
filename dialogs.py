@@ -576,6 +576,7 @@ class UpdateReadingProgressDialog(SizePersistedDialog):
         self.is_rating_visible = False
         self.is_dateread_visible = False
         self.is_review_text_visible = False
+        self.is_norat_visible = False
         self.read_shelf_name = 'read'
         self.plugin_action = plugin_action
 
@@ -1543,6 +1544,7 @@ class DoAddRemoveDialog(SizePersistedDialog):
         self.is_rating_visible = False
         self.is_dateread_visible = False
         self.is_review_text_visible = False
+        self.is_norat_visible = False
 
         user_info = cfg.plugin_prefs[cfg.STORE_USERS].get(user_name)
         self.shelves = user_info[cfg.KEY_SHELVES]
@@ -1650,6 +1652,7 @@ class DoAddRemoveDialog(SizePersistedDialog):
         self.is_rating_visible = False
         self.is_dateread_visible = False
         self.is_review_text_visible = False
+        self.is_norat_visible = False
         for shelf_name in selected_shelves:
             if self.shelves_map[shelf_name].get(cfg.KEY_ADD_RATING, False):
                 self.is_rating_visible = True
@@ -2120,6 +2123,11 @@ class DoShelfSyncDialog(SizePersistedDialog):
             actions_layout.addWidget(review_text_image_label, 3, 1)
             review_text_label = QLabel(_('Add Goodreads Review Text to calibre'), self)
             actions_layout.addWidget(review_text_label, 3, 2)
+        if self.update_norat:
+            review_text_image_label = ImageLabel(self, 'images/review_sync.png')
+            actions_layout.addWidget(review_text_image_label, 4, 1)
+            review_text_label = QLabel(_('Add Goodreads Number of Ratings to calibre'), self)
+            actions_layout.addWidget(review_text_label, 4, 2)
 
         self.auto_match_checkbox = QCheckBox(_('When searching calibre, if only one result is found then automatically link to it without prompting'))
         layout.addWidget(self.auto_match_checkbox)
@@ -2149,6 +2157,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
         self.update_rating = False
         self.update_date_read = False
         self.update_review_text = False
+        self.update_norat = False
         for shelf in self.shelves:
             sync_actions = shelf[cfg.KEY_SYNC_ACTIONS]
             if len(sync_actions) > 0:
@@ -2166,6 +2175,8 @@ class DoShelfSyncDialog(SizePersistedDialog):
                 self.update_date_read = True
             if shelf.get(cfg.KEY_SYNC_REVIEW_TEXT, False):
                 self.update_review_text = True
+            if shelf.get(cfg.KEY_SYNC_NORAT, False):
+                self.update_norat = True
         while text.endswith('<br>'):
             text = text[:-4]
         self.description.setText(text)
@@ -2176,6 +2187,8 @@ class DoShelfSyncDialog(SizePersistedDialog):
             self.update_date_read = False
         if self.update_review_text and not self.review_text_column:
             self.update_review_text = False
+        if self.update_norat and not self.norat_column:
+            self.update_norat = False
 
     def auto_match_state_changed(self):
         auto_match_result = self.auto_match_checkbox.isChecked()
@@ -2261,6 +2274,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
                 book['calibre_rating'] = 0
                 book['calibre_date_read'] = UNDEFINED_DATE
                 book['calibre_review_text'] = ''
+                book['calibre_ratings_count'] = 0
                 flattened_books.append(book)
         return flattened_books
 
@@ -2290,6 +2304,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
                 goodreads_book['calibre_rating'] = 0
                 goodreads_book['calibre_date_read'] = UNDEFINED_DATE
                 goodreads_book['calibre_review_text'] = ''
+                goodreads_book['calibre_ratings_count'] = 0
                 self.update_book_status(goodreads_book)
                 self.summary_table.populate_table_row(row, goodreads_book, book_index=index)
                 toggled_ids.append(goodreads_book['goodreads_id'])
@@ -2389,6 +2404,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
         goodreads_book['calibre_rating'] = calibre_books[0]['calibre_rating']
         goodreads_book['calibre_date_read'] = calibre_books[0]['calibre_date_read']
         goodreads_book['calibre_review_text'] = calibre_books[0]['calibre_review_text']
+        goodreads_book['calibre_ratings_count'] = calibre_books[0]['calibre_ratings_count']
         update_calibre_isbn_if_required(goodreads_book, goodreads_book['goodreads_isbn'])
         self.update_book_status(goodreads_book)
         self.summary_table.find_and_populate_table_row(row, goodreads_book)
@@ -2409,6 +2425,7 @@ class DoShelfSyncDialog(SizePersistedDialog):
                 other_book['calibre_rating'] = 0
                 other_book['calibre_date_read'] = UNDEFINED_DATE
                 other_book['calibre_review_text'] = ''
+                other_book['calibre_ratings_count'] = 0
                 self.update_book_status(other_book)
                 self.summary_table.find_and_populate_table_row(index, other_book)
 
@@ -2495,10 +2512,16 @@ class DoShelfSyncDialog(SizePersistedDialog):
                                 added_action = True
                                 sync_review_text_action = {'special':'review_text', 'action':'ADD', 'column':self.review_text_column, 'value':''}
                                 sync_actions.append(sync_review_text_action)
-                # MDL WORK TO DO!!!
-                sync_ratings_action = {'action':'ADD', 'column':self.norat_column, 'value':'goodreads_ratings_count'}
-                sync_actions.append(sync_ratings_action)
-                # MDL
+                if self.update_norat and shelf.get(cfg.KEY_SYNC_NORAT):
+                    added_action = False
+                    for book in sync_books:
+                        if book['calibre_ratings_count'] != book['goodreads_ratings_count']:
+                            book['calibre_ratings_count'] = book['goodreads_ratings_count']
+                            book['norat_changed'] = True
+                            if not added_action:
+                                added_action = True
+                                sync_norat_action = {'action':'ADD', 'column':self.norat_column, 'value':'goodreads_ratings_count'}
+                                sync_actions.append(sync_norat_action)
                 sync_actions.extend(shelf.get(cfg.KEY_SYNC_ACTIONS, []))
                 if len(sync_actions) > 0:
                     CalibreDbHelper().apply_actions_to_calibre(self.gui, sync_books, sync_actions)

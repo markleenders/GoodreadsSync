@@ -636,11 +636,9 @@ class HttpHelper(object):
                     book['goodreads_read_at'] = book['goodreads_started_at']
                 else:
                     book['goodreads_read_at'] = book['goodreads_date_updated']
-                debug_print("Read At :  " , book['goodreads_read_at'])
             book['goodreads_review_text'] = review_node.findtext('body').strip()
             if len(book['goodreads_review_text']) > 0:
                 debug_print("_convert_review_xml_node_to_book: length of review_text=", len(book['goodreads_review_text']))
-#                 debug_print("_convert_review_xml_node_to_book: review_text=", book['goodreads_review_text'])
         else:
             book['goodreads_shelves'] = ''
             book['goodreads_shelves_list'] = []
@@ -972,6 +970,7 @@ class CalibreSearcher(object):
             book['calibre_author_sort'] = ''
             book['calibre_series'] = ''
             book['calibre_rating'] = 0.
+            book['calibre_ratings_count'] = 0.
             book['calibre_date_read'] = UNDEFINED_DATE
             book['calibre_review_text'] = ''
             book['calibre_reading_progress'] = -1
@@ -1023,6 +1022,13 @@ class CalibreSearcher(object):
             reading_progress = mi.get(reading_progress_column)
             if reading_progress:
                 book['calibre_reading_progress'] = reading_progress
+
+        norat_column = cfg.plugin_prefs[cfg.STORE_PLUGIN].get(cfg.KEY_NORAT_COLUMN, '')
+        book['calibre_ratings_count'] = 0
+        if norat_column:
+            ratings_count = mi.get(rating_column)
+            if ratings_count:
+                book['calibre_ratings_count'] = int(ratings_count)
 
     def get_fuzzy_search_map_cache(self):
         if not self.fuzzy_book_map:

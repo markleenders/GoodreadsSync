@@ -429,7 +429,8 @@ class GoodreadsSyncAction(InterfaceAction):
             book['updated'] = book['status'] in [ActionStatus.ADD_EMPTY, ActionStatus.VALID] \
                               or book.get('rating_changed',False) \
                               or book.get('date_read_changed',False) \
-                              or book.get('review_text_changed',False)
+                              or book.get('review_text_changed',False) \
+                              or book.get('norat_changed',False)
             calibre_id = book['calibre_id']
             goodreads_id = book['goodreads_id']
             orig_calibre_id = book['orig_calibre_id']
