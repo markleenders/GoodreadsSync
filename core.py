@@ -45,7 +45,7 @@ def get_searchable_author(authors):
     # pass to the Goodreads website in FN LN format for just the first author.
     # We do this because Goodreads uses FN LN format and can get grumpy when it isn't.
     # Not really sure of the best way of determining if the user is using LN, FN
-    # Approach will be to check the tweak and see if a comma is in the name
+    # Approach will be to check the tweak and see if a comma is in the name.
     if authors == _('Unknown'):
         return ''
     author_list = authors.split('&')
