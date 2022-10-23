@@ -1,11 +1,7 @@
-#!/usr/bin/env python
-# vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
-from __future__ import (unicode_literals, division, absolute_import,
-                        print_function)
+from __future__ import unicode_literals, division, absolute_import, print_function
 
 __license__   = 'GPL v3'
-__copyright__ = '2011, Grant Drake <grant.drake@gmail.com>, 2015-2020 additions by David Forrester <davidfor@internode.on.net>'
-__docformat__ = 'restructuredtext en'
+__copyright__ = '2011, Grant Drake'
 
 # The class that all Interface Action plugin wrappers must inherit from
 from calibre.customize import InterfaceActionBase
@@ -21,11 +17,11 @@ class ActionGoodreadsSync(InterfaceActionBase):
     calibre utilities to run without needing to load the GUI libraries.
     '''
     name                    = 'Goodreads Sync'
-    description             = _('Sync from Calibre with the shelves of your GoodReads.com account')
+    description             = 'Sync from Calibre with the shelves of your GoodReads.com account'
     supported_platforms     = ['windows', 'osx', 'linux']
-    author                  = 'Grant Drake with additions by David Forrester'
-    version                 = (1, 15, 6)
-    minimum_calibre_version = (0, 8, 18)
+    author                  = 'Grant Drake'
+    version                 = (1, 16, 0)
+    minimum_calibre_version = (2, 0, 0)
 
     #: This field defines the GUI plugin class that contains all the code
     #: that actually does something. Its format is module_path:class_name
@@ -79,9 +75,9 @@ class ActionGoodreadsSync(InterfaceActionBase):
 # calibre-debug -e __init__.py
 if __name__ == '__main__':
     try:
-        from PyQt5.Qt import QApplication
+        from qt.core import QApplication
     except ImportError:
-        from PyQt4.Qt import QApplication
+        from PyQt5.Qt import QApplication
     from calibre.gui2.preferences import test_widget
     app = QApplication([])
     test_widget('Advanced', 'Plugins')

@@ -41,11 +41,11 @@ import errno
 from io import BytesIO
 try:
     import http.client as httplib
-except ImportError as e:
+except ImportError:
     import httplib
 try:
     from urllib.parse import urlparse, urljoin, splitport
-except ImportError as e:
+except ImportError:
     from urlparse import urlparse, urljoin 
     from urllib import splitport
 try:

@@ -1,12 +1,7 @@
-#!/usr/bin/env python
-# vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
-from __future__ import (unicode_literals, division, absolute_import,
-                        print_function)
-# from _elementtree import tostring
+from __future__ import unicode_literals, division, absolute_import, print_function
 
 __license__   = 'GPL v3'
-__copyright__ = '2011, Grant Drake <grant.drake@gmail.com>, 2015-2019 additions by David Forrester <davidfor@internode.on.net>'
-__docformat__ = 'restructuredtext en'
+__copyright__ = '2011, Grant Drake'
 
 import re, json, os, traceback, collections
 import xml.etree.ElementTree as et
@@ -14,16 +9,20 @@ import xml.etree.ElementTree as et
 # calibre Python 3 compatibility.
 try:
     from urllib.parse import parse_qsl, urlencode, quote_plus
-except ImportError as e:
+except ImportError:
     from urlparse import parse_qsl
     from urllib import urlencode, quote_plus
-import six
 from six import text_type as unicode
 
 try:
-    from PyQt5.Qt import QUrl
+    from qt.core import QUrl
 except ImportError:
-    from PyQt4.Qt import QUrl
+    from PyQt5.Qt import QUrl
+
+try:
+    load_translations()
+except NameError:
+    pass # load_translations() added in calibre 1.9
 
 from calibre.constants import DEBUG
 from calibre.ebooks.metadata import fmt_sidx, authors_to_string, check_isbn
@@ -33,19 +32,19 @@ from calibre.utils.config import tweaks
 from calibre.utils.cleantext import clean_ascii_chars
 from calibre.utils.date import parse_date, now, UNDEFINED_DATE
 from calibre import get_parsed_proxy
-from calibre import browser, random_user_agent
+from calibre import browser
+from calibre.devices.usbms.driver import debug_print
 
 import calibre_plugins.goodreads_sync.oauth2 as oauth
 import calibre_plugins.goodreads_sync.httplib2 as httplib2
 import calibre_plugins.goodreads_sync.config as cfg
-from calibre_plugins.goodreads_sync.common_utils import debug_print
 
 def get_searchable_author(authors):
     # Take the authors displayed and convert it into a search string we can
     # pass to the Goodreads website in FN LN format for just the first author.
     # We do this because Goodreads uses FN LN format and can get grumpy when it isn't.
     # Not really sure of the best way of determining if the user is using LN, FN
-    # Approach will be to check the tweak and see if a comma is in the name.
+    # Approach will be to check the tweak and see if a comma is in the name
     if authors == _('Unknown'):
         return ''
     author_list = authors.split('&')
@@ -90,7 +89,6 @@ class HttpHelper(object):
         self._browser = None
         
         proxy = get_parsed_proxy()
-        debug_print('HttpHelper::__init__: proxy=%s' % proxy)
         if proxy:
             proxy_type = httplib2.socks.PROXY_TYPE_HTTP_NO_TUNNEL
 
@@ -193,8 +191,10 @@ class HttpHelper(object):
             debug_print('Content: %s' % content)
             traceback.print_stack()
         detail = 'URL: {0}\nResponse Code: {1}\n{2}'.format(url, response['status'], content)
-        error_dialog(self.gui, 'Goodreads Failure',
-                     'The request contacting Goodreads has failed. Please try again.',
+        error_dialog(self.gui, _('Goodreads Failure'),
+                     _('The request contacting Goodreads has failed.')+'\n'+
+                     _('If it reoccurs you may have exceeded a request limit imposed by Goodreads.')+'\n'+
+                     _('In which case wait an additional 5-10 minutes before retrying.'),
                      det_msg=detail, show=True)
         return (None, None)
 
@@ -256,25 +256,6 @@ class HttpHelper(object):
                                 })
         response, content = self._oauth_request_post(oauth_client, url, body, success_status='201')
         if response:
-#             debug_print("create_shelf: response=", response)
-#             debug_print("create_shelf: content=", content)
-#             root = et.fromstring(content)
-#             debug_print("create_shelf: root=", root)
-# #             shelf_node = root.find('user_shelf')
-# #             debug_print("create_shelf: shelve_node=", shelf_node)
-#             shelve_id = int(root.findtext('id'))
-#             debug_print("create_shelf: id=", shelve_id)
-#             url = '%s/user_shelves/%s.xml' % (cfg.URL_HTTPS, shelve_id)
-#             body = urlencode({
-# #                                      'user_shelf[name]': str(new_shelf_name).lower(),
-#                                     'user_shelf[featured]': str(is_featured).lower(),
-#                                     'user_shelf[exclusive_flag]': str(is_exclusive).lower(),
-#                                      'user_shelf[sortable_flag ]': str(is_sortable).lower(),
-#                                  'user_shelf[recommend_for]': str(is_sortable).lower()
-#                                     })
-#             response, content = self._oauth_request_post(oauth_client, url, body, success_status='200', method='PUT')
-#             debug_print("create_shelf: response=", response)
-#             debug_print("create_shelf: content=", content)
             return True
         else:
             return False
@@ -324,7 +305,12 @@ class HttpHelper(object):
         if _response:
             if action == 'add':
                 root = self.get_xml_tree(content)
-                return int(root.findtext('review-id'))
+                review_id = root.findtext('review-id')
+                if (review_id):
+                    return int(review_id)
+                # If we didnt get the review id then we probably got rate limited in the response.
+                # Don't currently have the actual response goodreads send to detect this.
+                self._handle_failure(_response, content, url)
         return None
 
     def create_review(self, oauth_client, shelf_name, goodreads_id, rating, date_read, review_text):
@@ -397,16 +383,6 @@ class HttpHelper(object):
         if not reading_progress and not comment:
             return True
         url = '%s/user_status/index.xml' % (cfg.URL_HTTPS)
-#         body_info = { 'user_status[book_id]': book_id }
-#         if reading_progress:
-#             if progress_is_percent:
-#                 body_info['user_status[percent]'] = reading_progress
-#             else:
-#                 body_info['user_status[page]'] = reading_progress
-#         if comment and len(comment) > 0:
-#             body_info['user_status[body]'] = comment
-        success_status = '201'
-        body = None # urlencode(body_info)
         (response, _content) = self._request_get(url, suppress_status='404')
         debug_print('HttpHelper::get_statuses: response=%s' % (response, ))
         debug_print('HttpHelper::get_statuses: _content=%s' % (_content, ))
@@ -429,11 +405,8 @@ class HttpHelper(object):
         oauth_client = self.create_oauth_client(user_name)
         shelf_books = collections.OrderedDict()
         
-        self.plugin_action.progressbar_format(_("Page: %v"))
+        self.plugin_action.progressbar_format(_('Page')+': %v')
         for shelf in shelves:
-            # Set progressbar to number of retrieves from shelf
-            shelf_size = int(int(shelf['book_count'])/100) + 1
-            self.plugin_action.progressbar_show(shelf_size) 
             shelf_name = shelf['name']
             self.plugin_action.progressbar_label(_("Syncing from shelf: {0}").format(shelf_name))
             page = 0
@@ -443,15 +416,8 @@ class HttpHelper(object):
                 page = page + 1
                 debug_print("HttpHelper::get_goodreads_books_on_shelves: shelf='%s', page=%s" % (shelf_name, page))
                 # Use this url to test reading from someone elses shelf
-                #url = '%s/review/list.xml?v=2&shelf=%s&page=%d&per_page=%d&id=4176347' % \
-                #    (cfg.URL_HTTPS, shelf_name, page, per_page)
                 url = '%s/review/list.xml?v=2&shelf=%s&page=%d&per_page=%d' % \
                             (cfg.URL_HTTPS, shelf_name, page, per_page)
-                #http://www.goodreads.com/review/list/3948872?shelf=alternate-history
-                #url = '%s/review/list.xml?v=2&shelf=alternate-history&page=%d&per_page=%d&id=3948872' % \
-                #    (cfg.URL_HTTPS, page, per_page)
-                #if DEBUG:
-                #    debug_print('Goodreads Sync: Find books on shelf: %s' % url)
                 (response, content) = self._oauth_request_get(oauth_client, url)
 #                 debug_print("get_goodreads_books_on_shelves: content=", content)
 #                 open('E:\\test.xml','w').write(content)
@@ -478,8 +444,6 @@ class HttpHelper(object):
         user_id = users[user_name][cfg.KEY_USER_ID]
         url = '%s/review/show_by_user_and_book.xml?user_id=%s&book_id=%s' % \
             (cfg.URL_HTTPS, user_id, goodreads_id)
-        #url = '%s/review/show_by_user_and_book.xml?user_id=%s&book_id=%s' % \
-        #    (cfg.URL_HTTPS, '3948872', '13538762')
         (response, content) = self._request_get(url, suppress_status='404')
         debug_print('get_review_book: content=%s' %(content,))
         if not response:
@@ -491,9 +455,6 @@ class HttpHelper(object):
         #open('D:\\test_review.xml','w').write(content)
         root = self.get_xml_tree(content)
         review_node = root.find('review')
-#         url = '%s/review/show.xml?id=%s&page=2' % \
-#             (cfg.URL_HTTPS, 1008021241)
-#         (response, content) = self._request_get(url, suppress_status='404')
 #         debug_print('get_review_book: show content=%s' %(content,))
         if review_node is None:
             return None
@@ -636,9 +597,11 @@ class HttpHelper(object):
                     book['goodreads_read_at'] = book['goodreads_started_at']
                 else:
                     book['goodreads_read_at'] = book['goodreads_date_updated']
+            #review_text = review_node.findtext('body')
             book['goodreads_review_text'] = review_node.findtext('body').strip()
             if len(book['goodreads_review_text']) > 0:
                 debug_print("_convert_review_xml_node_to_book: length of review_text=", len(book['goodreads_review_text']))
+#                 debug_print("_convert_review_xml_node_to_book: review_text=", book['goodreads_review_text'])
         else:
             book['goodreads_shelves'] = ''
             book['goodreads_shelves_list'] = []
@@ -667,21 +630,14 @@ class HttpHelper(object):
         # This function attempts to convert a myriad of Goodreads title
         # combinations to strip out the series information as it is not
         # available separately in the API
-#         debug_print("_convert_goodreads_title_with_series  1 - text=%s" % text)
         if text.find('(') == -1:
             return (text, '')
         text_split = text.rpartition('(')
-#         debug_print("_convert_goodreads_title_with_series  2 - text_split=", text_split)
         title = text_split[0]
         series_info = text_split[2]
-#         debug_print("_convert_goodreads_title_with_series  3 - series_info=", series_info)
         series_info = series_info.rpartition(')')
-#         debug_print("_convert_goodreads_title_with_series  4 - series_info=", series_info)
         series_info = series_info[0]
-#         debug_print("_convert_goodreads_title_with_series  5 - series_info=", series_info)
-#         debug_print("_convert_goodreads_title_with_series  6 - series_info=", series_info)
         hash_pos = series_info.find('#')
-#         debug_print("_convert_goodreads_title_with_series  7 - hash_pos=", hash_pos)
         if hash_pos <= 0:
             # Cannot find the series # in expression or at start like (#1-7)
             # so consider whole thing just as title
@@ -689,13 +645,10 @@ class HttpHelper(object):
             series_info = ''
         else:
             # Check to make sure we have got all of the series information
-#             series_info = series_info[:len(series_info)-1] #Strip off trailing ')'
-#             debug_print("_convert_goodreads_title_with_series  8 - series_info=", series_info)
             while series_info.count(')') != series_info.count('('):
                 title_split = title.rpartition('(')
                 title = title_split[0].strip()
                 series_info = title_split[2] + '(' + series_info
-#             debug_print("_convert_goodreads_title_with_series  9 - series_info=", series_info)
         if series_info:
             series_partition = series_info.rpartition('#')
             series_name = series_partition[0].strip().replace(',', '')

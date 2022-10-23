@@ -1,39 +1,32 @@
-#!/usr/bin/env python
-# vim:fileencoding=UTF-8:ts=4:sw=4:sta:et:sts=4:ai
-from __future__ import (unicode_literals, division, absolute_import,
-                        print_function)
+from __future__ import unicode_literals, division, absolute_import, print_function
 
 __license__ = 'GPL v3'
-__copyright__ = '2011, Grant Drake <grant.drake@gmail.com>, 2015-2020 additions by David Forrester <davidfor@internode.on.net>'
-__docformat__ = 'restructuredtext en'
+__copyright__ = '2011, Grant Drake'
 
 import os
 from functools import partial
 try:
-    from PyQt5.Qt import QMenu, QToolButton, QUrl
+    from qt.core import QMenu, QToolButton
 except ImportError:
-    from PyQt4.Qt import QMenu, QToolButton, QUrl
+    from PyQt5.Qt import QMenu, QToolButton
 
-from calibre.gui2 import error_dialog, question_dialog, open_url
+try:
+    load_translations()
+except NameError:
+    pass # load_translations() added in calibre 1.9
+
+from calibre.gui2 import error_dialog, question_dialog
 from calibre.gui2.actions import InterfaceAction
-from calibre.utils.config import config_dir
-from calibre.constants import numeric_version as calibre_version
 
 import calibre_plugins.goodreads_sync.config as cfg
-from calibre_plugins.goodreads_sync.common_utils import (set_plugin_icon_resources, get_icon, ProgressBar,
-                                                         create_menu_action_unique, debug_print)
+from calibre_plugins.goodreads_sync.common_icons import set_plugin_icon_resources, get_icon
+from calibre_plugins.goodreads_sync.common_menus import unregister_menu_actions, create_menu_action_unique
+from calibre_plugins.goodreads_sync.common_dialogs import ProgressBarDialog
 from calibre_plugins.goodreads_sync.core import (CalibreSearcher, HttpHelper, IdCaches,
                                                  update_calibre_isbn_if_required)
 from calibre_plugins.goodreads_sync.dialogs import (DoAddRemoveDialog, DoShelfSyncDialog, SwitchEditionDialog,
                                             PickGoodreadsBookDialog, ActionStatus, ChooseShelvesToSyncDialog,
                                             UpdateReadingProgressDialog)
-
-try:
-    debug_print("GoodreadsSync::action.py - loading translations")
-    load_translations()
-except NameError:
-    debug_print("GoodreadsSync::action.py - exception when loading translations")
-    pass # load_translations() added in calibre 1.9
 
 PLUGIN_ICONS = ['images/goodreads_sync.png',        'images/refresh.png',
                 'images/shelf.png',                 'images/shelf_exclusive.png',
@@ -57,14 +50,13 @@ class GoodreadsSyncAction(InterfaceAction):
 
     name = 'Goodreads Sync'
     # Create our top-level menu/toolbar action (text, icon_path, tooltip, keyboard shortcut)
-    action_spec = ('Goodreads', None, None, None)
+    action_spec = (_('Goodreads'), None, None, None)
     popup_type = QToolButton.InstantPopup
     action_type = 'current'
     pb = None
 
     def genesis(self):
         self.menu = QMenu(self.gui)
-        self.menu_actions = []
 
         # Read the plugin icons and store for potential sharing with the config widget
         icon_resources = self.load_resources(PLUGIN_ICONS)
@@ -87,47 +79,41 @@ class GoodreadsSyncAction(InterfaceAction):
         self.id_caches.invalidate_caches()
 
     def rebuild_menus(self):
+        # Ensure any keyboard shortcuts from previous display of plugin menu are cleared
+        unregister_menu_actions(self)
+
         self.users = cfg.plugin_prefs[cfg.STORE_USERS]
         c = cfg.plugin_prefs[cfg.STORE_PLUGIN]
         m = self.menu
         m.clear()
         
-        for action in self.menu_actions:
-            self.gui.keyboard.unregister_shortcut(action.calibre_shortcut_unique_name)
-            # starting in calibre 2.10.0, actions are registers at
-            # the top gui level for OSX' benefit.
-            if calibre_version >= (2,10,0):
-                self.gui.removeAction(action)
-        self.menu_actions = []
-        
-#        self.actions_unique_map = {}
         # Only display action submenus if a user has been defined via config dialog
         if len(self.users) > 0:
             # Create menu items for the Add to shelf items
             if c.get(cfg.KEY_DISPLAY_ADD, True):
-                self.create_action_with_users_sub_menu(m, _('Add to shelf...'), 'add', 'images/add_to_shelf.png')
+                self.create_action_with_users_sub_menu(m, _('Add to shelf')+'...', 'add', 'images/add_to_shelf.png')
             if c.get(cfg.KEY_DISPLAY_REMOVE, True):
-                self.create_action_with_users_sub_menu(m, _('Remove from shelf...'), 'remove', 'images/remove_from_shelf.png')
+                self.create_action_with_users_sub_menu(m, _('Remove from shelf')+'...', 'remove', 'images/remove_from_shelf.png')
             if c.get(cfg.KEY_DISPLAY_UPDATE_PROGRESS, True):
-                self.create_action_with_users_sub_menu(m, _('Update reading progress'), 'progress', 'images/remove_from_shelf.png')
+                self.create_action_with_users_sub_menu(m, _('Update reading progress')+'...', 'progress', 'images/remove_from_shelf.png')
             if c.get(cfg.KEY_DISPLAY_SYNC, True):
                 m.addSeparator()
-                self.create_action_with_users_sub_menu(m, _('Sync from shelf...'), 'sync', 'images/sync_from_shelf.png')
+                self.create_action_with_users_sub_menu(m, _('Sync from shelf')+'...', 'sync', 'images/sync_from_shelf.png')
             if c.get(cfg.KEY_DISPLAY_VIEW_SHELF, True):
                 m.addSeparator()
                 self.create_sub_menu_for_users_action(m, _('View shelf'), 'view', 'images/view_shelf.png')
             m.addSeparator()
 
             # Create menus for linking to Goodreads and working with linked books
-            self.create_menu_item_ex(m, _('Link to Goodreads...'), 'images/link_add.png',
+            create_menu_action_unique(self, m, _('Link to Goodreads')+'...', 'images/link_add.png',
                     _('Add, replace or clear link to a Goodreads book'),
                     triggered=self.search_goodreads_to_link_book)
             self.linked_book_submenu = m.addMenu(get_icon('images/link.png'), _('Linked book'))
 
-            self.create_menu_item_ex(self.linked_book_submenu, _('View linked book'),
+            create_menu_action_unique(self, self.linked_book_submenu, _('View linked book'),
                     'images/view_book.png', _('Open a web browser page showing the linked Goodreads book'),
                     triggered=self.view_linked_books)
-            self.create_menu_item_ex(self.linked_book_submenu, _('Switch Goodreads Edition...'),
+            create_menu_action_unique(self, self.linked_book_submenu, _('Switch Goodreads Edition')+'...',
                     'images/link_add.png', _('Link to a different edition of a Goodreads book'),
                     triggered=self.switch_linked_edition)
             self.linked_book_submenu.addSeparator()
@@ -135,7 +121,7 @@ class GoodreadsSyncAction(InterfaceAction):
             self.create_shelves_tags_menu_item(self.linked_book_submenu)
             self.linked_book_submenu.addSeparator()
 
-            self.create_menu_item_ex(self.linked_book_submenu, _('Remove link'),
+            create_menu_action_unique(self, self.linked_book_submenu, _('Remove link'),
                     'images/link_delete.png', _('Clear the link with Goodreads'),
                     triggered=self.remove_links)
 
@@ -143,28 +129,14 @@ class GoodreadsSyncAction(InterfaceAction):
         create_menu_action_unique(self, m, _('&Customize plugin') + '...', 'config.png',
                                   shortcut=False, triggered=self.show_configuration)
         create_menu_action_unique(self, m, _('&Help'), 'help.png',
-                                  shortcut=False, triggered=self.show_help)
+                                  shortcut=False, triggered=cfg.show_help)
 
-#        # Before we finalize, make sure we delete any actions for menus that are no longer displayed
-#        for menu_id, unique_name in self.old_actions_unique_map.items():
-#            if menu_id not in self.actions_unique_map:
-#                self.gui.keyboard.unregister_shortcut(unique_name)
-#        self.old_actions_unique_map = self.actions_unique_map
         self.gui.keyboard.finalize()
 
     def about_to_show_menu(self):
         if hasattr(self, 'linked_book_submenu'):
             selected_linked = self.are_selected_books_linked()
             self.linked_book_submenu.setEnabled(selected_linked)
-
-    def create_menu_item_ex(self, parent_menu, menu_text, image=None, tooltip=None,
-                           shortcut=None, triggered=None, is_checked=None, shortcut_name=None,
-                           unique_name=None):
-        ac = create_menu_action_unique(self, parent_menu, menu_text, image, tooltip,
-                                       shortcut, triggered, is_checked, shortcut_name, unique_name)
-        self.menu_actions.append(ac)
-
-        return ac
 
     def create_action_with_users_sub_menu(self, parent_menu, title, action, image_name):
         if len(list(self.users.keys())) > 1:
@@ -181,7 +153,7 @@ class GoodreadsSyncAction(InterfaceAction):
                     triggered_action = partial(self.update_reading_progress, action, user_name)
                 else:
                     triggered_action = partial(self.sync_shelves, user_name)
-                self.create_menu_item_ex(user_sub_menu, user_name, image_name,
+                create_menu_action_unique(self, user_sub_menu, user_name, image_name,
                                          shortcut_name=unique_name, unique_name=unique_name,
                                          triggered=triggered_action)
         else:
@@ -194,7 +166,7 @@ class GoodreadsSyncAction(InterfaceAction):
                 triggered_action = partial(self.update_reading_progress, action, user_name)
             else:
                 triggered_action = partial(self.sync_shelves, user_name)
-            self.create_menu_item_ex(parent_menu, title, image_name,
+            create_menu_action_unique(self, parent_menu, title, image_name,
                                      shortcut_name=unique_name, unique_name=unique_name,
                                      triggered=triggered_action)
 
@@ -222,7 +194,7 @@ class GoodreadsSyncAction(InterfaceAction):
                 image_name = 'images/shelf_exclusive.png' if is_exclusive else 'images/shelf.png'
                 if active:
                     unique_name = 'User "%s" %s "%s"' % (user_name, title, shelf_name)
-                    ac = self.create_menu_item_ex(parent_menu, shelf_name, image_name,
+                    ac = create_menu_action_unique(self, parent_menu, shelf_name, image_name,
                                                   shortcut_name=unique_name, unique_name=unique_name)
                     ac.triggered.connect(partial(self.grhttp.view_shelf, user_name, shelf_name))
 
@@ -256,7 +228,7 @@ class GoodreadsSyncAction(InterfaceAction):
             triggered = partial(self.download_tags, user_name)
         else:
             triggered = partial(self.upload_tags, user_name)
-        self.create_menu_item_ex(parent, title, image, tooltip, unique_name=unique_name,
+        create_menu_action_unique(self, parent, title, image, tooltip, unique_name=unique_name,
                                  shortcut_name=unique_name, triggered=triggered)
 
     def are_selected_books_linked(self):
@@ -326,7 +298,6 @@ class GoodreadsSyncAction(InterfaceAction):
 
     def sync_shelves(self, user_name):
         # Build a list of shelves that are valid to sync from
-        debug_print("sync_shelves - start")
         self.progressbar(_("Syncing books from shelves"), show=False)
         shelves = self._get_shelves_valid_for_sync(user_name)
         if len(shelves) == 0:
@@ -337,7 +308,6 @@ class GoodreadsSyncAction(InterfaceAction):
         choose_dialog.exec_()
         if choose_dialog.result() != choose_dialog.Accepted:
             return
-        debug_print("sync_shelves - returned from ChooseShelvesToSyncDialog")
 
         if choose_dialog.goodreads_shelf_books is None:
             return error_dialog(self.gui, _('Unable to Sync'),
@@ -346,15 +316,12 @@ class GoodreadsSyncAction(InterfaceAction):
         previous = self.gui.library_view.currentIndex()
         # Ensure our Goodreads id mapping caches are reset
         self.id_caches.invalidate_caches()
-        debug_print("sync_shelves - About to open DoShelfSyncDialog")
         # Display the books indicating which are linked allowing user to apply/cancel
         d = DoShelfSyncDialog(self.gui, self, self.grhttp, user_name, choose_dialog.selected_shelves,
                               choose_dialog.goodreads_shelf_books, self.calibre_searcher)
         d.exec_()
-        debug_print("sync_shelves - returned from DoShelfSyncDialog")
         if d.result() == d.Accepted:
             msg = _('Synchronised {0} books from shelf').format(d.valid_count)
-            debug_print("sync_shelves - About to _update_goodreads_ids")
             self.progressbar(_("Syncing books from shelves"), show=False)
             self.progressbar_label(_("Updating books"))
             self.progressbar_format(_("Book: %v"))
@@ -362,8 +329,6 @@ class GoodreadsSyncAction(InterfaceAction):
             # When finally exiting, update the Goodreads Id and ISBN where any were changed
             self._update_calibre_database_ids_after_sync(d.goodreads_books)
 
-#             self._update_goodreads_ids(d.goodreads_books, msg, previous)
-            debug_print("sync_shelves - finished _update_goodreads_ids")
             num_added_books = d.num_added_books
             if num_added_books > 0:
                 self.gui.library_view.model().books_added(num_added_books)
@@ -379,25 +344,15 @@ class GoodreadsSyncAction(InterfaceAction):
 
     def _update_goodreads_ids(self, calibre_books, msg, previous):
         # When finally exiting, update the Goodreads Id and ISBN where any were changed
-        debug_print("_update_goodreads_ids - Start")
-        debug_print("_update_goodreads_ids - Calling: _update_calibre_database_ids_for_selection for %s books" % len(calibre_books))
         self._update_calibre_database_ids_for_selection(calibre_books)
-#         self._update_calibre_database_ids_after_sync(calibre_books)
 
         self.gui.status_bar.showMessage(msg)
-        debug_print("_update_goodreads_ids - status message: %s" % msg)
         updated_ids = [book['calibre_id'] for book in calibre_books if book['updated']]
-        debug_print("_update_goodreads_ids - Have list of updated book ids - number=%s" % len(updated_ids))
         if len(updated_ids) > 0:
-            debug_print("_update_goodreads_ids - Calling: self.gui.library_view.model().refresh_ids(updated_ids)")
             self.gui.library_view.model().refresh_ids(updated_ids)
-            debug_print("_update_goodreads_ids - Calling: self.gui.library_view.currentIndex()")
             current = self.gui.library_view.currentIndex()
-            debug_print("_update_goodreads_ids - Calling: self.gui.library_view.model().current_changed(current, previous)")
             self.gui.library_view.model().current_changed(current, previous)
-            debug_print("_update_goodreads_ids - Calling: self.gui.tags_view.recount()")
             self.gui.tags_view.recount()
-        debug_print("_update_goodreads_ids - Finished")
 
 
     def _get_shelves_valid_for_sync(self, user_name):
@@ -552,12 +507,10 @@ class GoodreadsSyncAction(InterfaceAction):
 
     def _update_calibre_database_ids_for_selection(self, calibre_books):
         # Our collection of books are a selection in calibre
-        debug_print("_update_calibre_database_ids_for_selection - Start")
         db = self.gui.library_view.model().db
-        gr_cache = self.id_caches.goodreads_to_calibre_ids()
-        cb_cache = self.id_caches.calibre_to_goodreads_ids()
+        _gr_cache = self.id_caches.goodreads_to_calibre_ids()
+        _cb_cache = self.id_caches.calibre_to_goodreads_ids()
         for book in calibre_books:
-            debug_print("_update_calibre_database_ids_for_selection - Processing book id: %s" % book['calibre_id'])
             self.progressbar_label("Updating book %s" % book['calibre_id'])
             self.progressbar_increment()
             book['updated'] = False
@@ -566,10 +519,6 @@ class GoodreadsSyncAction(InterfaceAction):
             orig_goodreads_id = book.get('orig_goodreads_id', None)
             isbn = book['calibre_isbn']
             orig_isbn = book['orig_calibre_isbn']
-            debug_print("_update_calibre_database_ids_for_selection - goodreads_id: %s" % goodreads_id)
-            debug_print("_update_calibre_database_ids_for_selection - orig_goodreads_id: %s" % orig_goodreads_id)
-            debug_print("_update_calibre_database_ids_for_selection - isbn: %s" % isbn)
-            debug_print("_update_calibre_database_ids_for_selection - orig_isbn: %s" % orig_isbn)
             if isbn and isbn != orig_isbn:
                 db.set_isbn(calibre_id, isbn, notify=False, commit=False)
                 book['updated'] = True
@@ -577,23 +526,7 @@ class GoodreadsSyncAction(InterfaceAction):
                 continue
             db.set_identifier(calibre_id, 'goodreads', goodreads_id, notify=False, commit=False)
             book['updated'] = True
-            continue
-            # We need to maintain our in-memory cache of mapped ids.
-            cb_cache[calibre_id] = goodreads_id
-            calibre_ids_mapped = gr_cache.get(goodreads_id, [])
-            calibre_ids_mapped.append(calibre_id)
-            gr_cache[goodreads_id] = calibre_ids_mapped
-            if orig_goodreads_id:
-                # Book was mapped to a different id previously. Remove old mapping if exists
-                orig_calibre_ids_mapped = gr_cache.get(orig_goodreads_id, [])
-                if calibre_id in orig_calibre_ids_mapped:
-                    orig_calibre_ids_mapped.remove(calibre_id)
-                    if len(orig_calibre_ids_mapped) == 0:
-                        del gr_cache[orig_goodreads_id]
-                    else:
-                        gr_cache[orig_goodreads_id] = orig_calibre_ids_mapped
         db.commit()
-        debug_print("_update_calibre_database_ids_for_selection - Finish")
 
     def _is_valid_selection(self):
         rows = self.gui.library_view.selectionModel().selectedRows()
@@ -601,9 +534,7 @@ class GoodreadsSyncAction(InterfaceAction):
             return False
         if len(rows) > 50:
             error_dialog(self.gui, _('Too Many Rows'),
-                _('You have too many rows selected in Calibre. Bulk operations are not ' + \
-                'supported by this API. Reduce your selection to at most 50 rows.<br>' + \
-                'Refer to the Help file for this plugin for details and alternatives.'),
+                _('Reduce your selection to at most 50 rows.'),
                 show=True)
             return False
         return True
@@ -633,9 +564,9 @@ class GoodreadsSyncAction(InterfaceAction):
         if not rows or len(rows) == 0:
             return
         if not question_dialog(self.gui, _('Are you sure?'), '<p>' +
-                               _('Removing any linked Goodreads ids may result in you having to manually ' +
-                               'select the link again for these book(s).<p>' +
-                               'Are you sure you want to remove the link(s)?'), show_copy_button=False):
+                               _("Removing any linked Goodreads ids may result in you having to manually " 
+                               "select the link again for these book(s).")+'<p>' +
+                               _('Are you sure you want to remove the link(s)?'), show_copy_button=False):
             return
         previous = self.gui.library_view.currentIndex()
         # Ensure our Goodreads id mapping caches are reset
@@ -644,7 +575,7 @@ class GoodreadsSyncAction(InterfaceAction):
             gr_cache = self.id_caches.goodreads_to_calibre_ids()
             cb_cache = self.id_caches.calibre_to_goodreads_ids()
             updated_ids = []
-            self.gui.status_bar.showMessage(_('Removing Goodreads ids from books...'))
+            self.gui.status_bar.showMessage(_('Removing Goodreads ids from books')+'...')
             for row in rows:
                 calibre_id = db.id(row.row())
                 db.set_identifier(calibre_id, 'goodreads', '', commit=False)
@@ -791,7 +722,6 @@ class GoodreadsSyncAction(InterfaceAction):
             book = self.grhttp.get_review_book(user_name, goodreads_id)
             if not book:
                 continue
-            debug_print("download_tags: ", book)
             orig_calibre_tags = self._get_calibre_tags_for_book(db, calibre_id, tag_column, tag_column_label, is_multiple)
             # For a custom column we will always overwrite with fresh values
             # For the tags column we will always append
@@ -893,24 +823,6 @@ class GoodreadsSyncAction(InterfaceAction):
                 calibre_tags = set([t.strip() for t in tags.split(',')])
         return calibre_tags
 
-    def show_help(self):
-        # Extract on demand the help file resource
-        def get_help_file_resource():
-            # We will write the help file out every time, in case the user upgrades the plugin zip
-            # and there is a later help file contained within it.
-            HELP_FILE = 'Goodreads Sync Help.htm'
-            file_path = os.path.join(config_dir, 'plugins', HELP_FILE)
-            # In version 1.1 I have renamed the help file, so delete the old one if it exists
-            legacy_file_path = os.path.join(config_dir, 'plugins', 'goodreads_sync_help.htm')
-            if os.path.exists(legacy_file_path) and os.access(legacy_file_path, os.W_OK):
-                os.remove(legacy_file_path)
-            file_data = self.load_resources(HELP_FILE)[HELP_FILE]
-            with open(file_path, 'wb') as f:
-                f.write(file_data)
-            return file_path
-        url = 'file:///' + get_help_file_resource()
-        open_url(QUrl(url))
-
     def _get_tag_mappings(self, user_config):
         tag_mappings = {}
         for shelf in user_config[cfg.KEY_SHELVES]:
@@ -920,7 +832,6 @@ class GoodreadsSyncAction(InterfaceAction):
         return tag_mappings
 
     def show_configuration(self):
-        debug_print("GoodReads Sync::show_configuration - before do_user_config")
         restart_message=_("Calibre must be restarted before the plugin can be configured.")
         # Check if a restart is needed. If the restart is needed, but the user does not
         # trigger it, the result is true and we do not do the configuration.
@@ -928,7 +839,6 @@ class GoodreadsSyncAction(InterfaceAction):
             return
 
         self.interface_action_base_plugin.do_user_config(self.gui)
-        debug_print("GoodReads Sync::show_configuration - after do_user_config")
         restart_message= _("New custom colums have been created."
                             "\nYou will need to restart calibre for this change to be applied."
                         )
@@ -941,15 +851,13 @@ class GoodreadsSyncAction(InterfaceAction):
             from calibre.gui2 import show_restart_warning
             do_restart = show_restart_warning(restart_message)
             if do_restart:
-                debug_print("GoodReads Sync::check_if_restart_needed - restarting calibre...")
                 self.gui.quit(restart=True)
             else:
-                debug_print("GoodReads Sync::check_if_restart_needed - calibre needs to be restarted, do not open configuration")
                 return True
         return False
 
     def progressbar(self, window_title=_("Goodreads Sync progress"), on_top=False, show=False):
-        self.pb = ProgressBar(parent=self.gui, window_title=window_title, on_top=on_top)
+        self.pb = ProgressBarDialog(parent=self.gui, window_title=window_title, on_top=on_top)
         if show:
             self.pb.show()
 

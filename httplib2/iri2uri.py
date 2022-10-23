@@ -15,7 +15,7 @@ __history__ = """
 # calibre Python 3 compatibility.
 try:
     from urllib.parse import urlsplit, urlunsplit
-except ImportError as e:
+except ImportError:
     from urlparse import urlsplit, urlunsplit
 import six
 from six import text_type as unicode
