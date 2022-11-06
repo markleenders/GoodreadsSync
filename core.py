@@ -407,6 +407,9 @@ class HttpHelper(object):
         
         self.plugin_action.progressbar_format(_('Page')+': %v')
         for shelf in shelves:
+            # Set progressbar to number of retrieves from shelf
+            shelf_size = int(int(shelf['book_count'])/100) + 1
+            self.plugin_action.progressbar_show(shelf_size) 
             shelf_name = shelf['name']
             self.plugin_action.progressbar_label(_("Syncing from shelf: {0}").format(shelf_name))
             page = 0

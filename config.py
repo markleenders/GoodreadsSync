@@ -679,10 +679,11 @@ class MaintainActionsDialog(SizePersistedDialog):
             rating_title = _('Sync rating from Goodreads when syncing from this shelf')
             date_read_title = _('Sync date read from Goodreads when syncing from this shelf')
             review_text_title = _('Sync review text from Goodreads when syncing from this shelf')
+            norat_title = _('Sync ratings count from Goodreads when syncing from this shelf')
             upload_rating_enabled = shelves[0].get(KEY_SYNC_RATING, False) and not is_currently_reading_shelf
             upload_date_read_enabled = shelves[0].get(KEY_SYNC_DATE_READ, False) and not is_currently_reading_shelf
             upload_review_text_enabled = shelves[0].get(KEY_SYNC_REVIEW_TEXT, False) and not is_currently_reading_shelf
-             upload_norat_enabled = shelves[0].get(KEY_SYNC_NORAT, False) and not is_currently_reading_shelf
+            upload_norat_enabled = shelves[0].get(KEY_SYNC_NORAT, False) and not is_currently_reading_shelf
 
         self.upload_rating = QCheckBox(rating_title)
         layout.addWidget(self.upload_rating)
@@ -699,6 +700,12 @@ class MaintainActionsDialog(SizePersistedDialog):
         self.upload_review_text = QCheckBox(review_text_title)
         layout.addWidget(self.upload_review_text)
         self.upload_review_text.setChecked(upload_review_text_enabled)
+
+        if not is_shelf_add_actions:
+            self.upload_norat = QCheckBox(norat_title)
+            layout.addWidget(self.upload_norat)
+            self.upload_norat.setChecked(upload_norat_enabled)
+
         if (is_currently_reading_shelf):
             self.upload_review_text.setDisabled(True)
 
